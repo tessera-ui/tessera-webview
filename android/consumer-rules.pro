@@ -1,0 +1,1 @@
+-keep class com.tessera.webview.WebViewPlugin { public static *; }

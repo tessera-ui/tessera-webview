@@ -1,0 +1,32 @@
+[package]
+name = "tessera-webview"
+version = "0.1.0"
+edition = "2024"
+description = "Native WebView components and platform services for Tessera"
+license = "MIT OR Apache-2.0"
+exclude = ["android/build", "android/.gradle", "android/local.properties"]
+
+[dependencies]
+async-channel = "2.5"
+futures-channel = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tessera-foundation = "0.1.0"
+tessera-ui = "3.0.0"
+tokio = { version = "1.48", features = ["time"] }
+url = "2.5"
+
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux", target_os = "ios"))'.dependencies]
+wry = "0.57.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+base64 = "0.22"
+
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }
+objc2-ui-kit = { version = "0.3", features = ["UIView"] }
+
+[package.metadata.tessera]
