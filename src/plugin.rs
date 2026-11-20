@@ -57,9 +57,11 @@ impl EventSink {
 #[derive(Default)]
 struct Geometry {
     bounds: Option<FloatRect>,
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     visible: Option<FloatRect>,
 }
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 impl Geometry {
     fn is_visible(&self) -> bool {
         let (Some(full), Some(visible)) = (self.bounds, self.visible) else {
@@ -175,15 +177,14 @@ impl WebViewPlugin {
             entry.evaluations.clear();
             entry.declared_source = source.clone();
             entry.source = source;
-            if let Some(view) = &entry.native {
-                let result = entry
+            if let Some(view) = &entry.native
+                && let Err(error) = entry
                     .source
                     .validate(&entry.options.navigation)
-                    .and_then(|_| view.load(&entry.source));
-                if let Err(error) = result {
-                    self.report(id, error);
-                    return Ok(());
-                }
+                    .and_then(|_| view.load(&entry.source))
+            {
+                self.report(id, error);
+                return Ok(());
             }
         }
         if changed {
@@ -201,10 +202,12 @@ impl WebViewPlugin {
     ) -> Result<(), WebViewError> {
         let entry = self.owned(id, owner)?;
         entry.geometry.bounds = Some(bounds);
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         self.reconcile_and_report(id);
         Ok(())
     }
 
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     pub(crate) fn visibility(
         &mut self,
         id: u64,
@@ -222,6 +225,19 @@ impl WebViewPlugin {
             return Err(WebViewError::ControllerInUse);
         }
         Ok(entry)
+    }
+
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    pub(crate) fn factory(
+        &mut self,
+        id: u64,
+        owner: u64,
+    ) -> Result<Option<(u64, backend::Factory)>, WebViewError> {
+        let entry = self.owned(id, owner)?;
+        Ok(entry
+            .native
+            .as_ref()
+            .map(|view| (entry.generation, view.factory())))
     }
 
     fn sink(&self, id: u64) -> EventSink {
@@ -246,6 +262,7 @@ impl WebViewPlugin {
         }
     }
 
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn reconcile(&mut self, id: u64) -> Result<(), WebViewError> {
         let sink = self.sink(id);
         let entry = self.entries.get_mut(&id).unwrap();
@@ -283,6 +300,25 @@ impl WebViewPlugin {
         Ok(())
     }
 
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    fn reconcile(&mut self, id: u64) -> Result<(), WebViewError> {
+        let sink = self.sink(id);
+        let entry = self.entries.get_mut(&id).unwrap();
+        entry.options.validate()?;
+        entry.source.validate(&entry.options.navigation)?;
+        if let Some(context) = &self.context
+            && entry.native.is_none()
+        {
+            entry.native = Some(backend::NativeView::new(
+                context,
+                &entry.source,
+                &entry.options,
+                sink,
+            )?);
+        }
+        Ok(())
+    }
+
     pub(crate) fn native(&self, id: u64) -> Result<&backend::NativeView, WebViewError> {
         let entry = self.entries.get(&id).ok_or(WebViewError::NotMounted)?;
         self.context.as_ref().ok_or(WebViewError::HostNotResumed)?;
@@ -293,6 +329,16 @@ impl WebViewPlugin {
     }
 
     pub(crate) fn bounds(&self, id: u64) -> Result<FloatRect, WebViewError> {
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        {
+            self.native(id)?;
+            self.entries[&id]
+                .geometry
+                .bounds
+                .filter(|bounds| valid_bounds(*bounds))
+                .ok_or(WebViewError::NotReady)
+        }
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         self.native(id)?
             .bounds(self.context.as_ref().unwrap().window().scale_factor())
     }
@@ -366,6 +412,7 @@ impl WebViewPlugin {
 
 impl Plugin for WebViewPlugin {
     fn on_resumed(&mut self, context: &PluginContext) -> PluginResult {
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         backend::initialize(context)?;
         if self.events.is_none() {
             let receiver = self.receiver.clone();
@@ -380,13 +427,29 @@ impl Plugin for WebViewPlugin {
                 }
             }));
         }
-        #[cfg(any(target_os = "android", target_os = "linux"))]
+        #[cfg(target_os = "linux")]
         {
             let context = context.clone();
             let sender = self.sender.clone();
             self.pump = Some(spawn_local(async move {
                 loop {
                     backend::pump(&context, &sender);
+                    tokio::time::sleep(std::time::Duration::from_millis(16)).await;
+                }
+            }));
+        }
+        #[cfg(target_os = "android")]
+        {
+            let sender = self.sender.clone();
+            self.pump = Some(spawn_local(async move {
+                loop {
+                    let _ = with_plugin::<WebViewPlugin, _>(|plugin| {
+                        for entry in plugin.entries.values() {
+                            if let Some(view) = &entry.native {
+                                view.pump(&sender);
+                            }
+                        }
+                    });
                     tokio::time::sleep(std::time::Duration::from_millis(16)).await;
                 }
             }));
@@ -404,7 +467,10 @@ impl Plugin for WebViewPlugin {
             self.pump = None;
         }
         for entry in self.entries.values_mut() {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             entry.release();
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            entry.evaluations.clear();
         }
         self.context = None;
         Ok(())

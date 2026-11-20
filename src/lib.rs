@@ -1,8 +1,8 @@
 //! Native WebView components for Tessera.
 //!
 //! Register [`WebViewPlugin`] with [`EntryPointWebViewExt::webview`], then place
-//! [`webview()`] in a bounded layout. Native views are above the GPU scene; see
-//! the README for clipping, platform prerequisites, and security limitations.
+//! [`webview()`] in a bounded layout. See the README for platform-specific
+//! composition behavior, prerequisites, and security limitations.
 
 // tessera-macros 1.0 emits mem::replace(..., Some(...)) in generated setters.
 #![allow(clippy::mem_replace_option_with_some)]
@@ -14,6 +14,8 @@ use tessera_ui::{
     CallbackWith, EntryPoint, Modifier, Stack, layout::layout, modifier::FocusModifierExt as _,
     remember, remember_with_key, with_plugin,
 };
+#[cfg(any(target_os = "android", target_os = "ios"))]
+use tessera_ui::{key, platform_view::platform_view};
 
 mod backend;
 mod plugin;
@@ -129,7 +131,7 @@ impl WebViewController {
         access(|plugin| plugin.native(self.0)?.can_go_forward())
     }
 
-    /// Returns the native view's physical-pixel rectangle in its host window.
+    /// Returns the browser's window bounds in physical pixels, before clipping.
     pub fn bounds(self) -> Result<tessera_ui::FloatRect, WebViewError> {
         access(|plugin| plugin.bounds(self.0))
     }
@@ -168,7 +170,8 @@ impl Drop for Lease {
 ///
 /// ## Usage
 ///
-/// Register the plugin and place the view in a bounded, non-overlapping layout.
+/// Register the plugin and place the view in a bounded layout. Desktop views
+/// must not overlap Tessera content drawn above them.
 ///
 /// ## Parameters
 ///
@@ -224,10 +227,18 @@ pub fn webview(
         .on_layout_coordinates(move |coordinates: tessera_ui::LayoutCoordinates| {
             let _ =
                 access(|plugin| plugin.position(controller.0, owner, coordinates.window_bounds()));
-        })
-        .on_visible_window_bounds(move |bounds| {
-            let _ = access(|plugin| plugin.visibility(controller.0, owner, bounds));
         });
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    if let Ok(Some((generation, factory))) = access(|plugin| plugin.factory(controller.0, owner)) {
+        key(generation, || {
+            platform_view(factory, modifier);
+        });
+        return;
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let modifier = modifier.on_visible_window_bounds(move |bounds| {
+        let _ = access(|plugin| plugin.visibility(controller.0, owner, bounds));
+    });
     layout(Stack).modifier(modifier);
 }
 

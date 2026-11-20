@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.view.View;
-import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
@@ -15,7 +14,6 @@ import android.webkit.WebSettings;
 import android.webkit.WebStorage;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.FrameLayout;
 
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
@@ -24,16 +22,15 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class WebViewPlugin {
-    private static final ConcurrentHashMap<String, Browser> BROWSERS = new ConcurrentHashMap<>();
-    private static final ArrayBlockingQueue<JSONObject> EVENTS = new ArrayBlockingQueue<>(256);
-
     private WebViewPlugin() {}
 
     private static JSONObject object(Object... entries) {
@@ -46,50 +43,39 @@ public final class WebViewPlugin {
         return result;
     }
 
-    private static void event(String id, long generation, JSONObject event) {
-        EVENTS.offer(object("id", Long.parseLong(id), "generation", generation,
-            "payload", object("type", "event", "event", event)));
+    public static boolean supportsPlatformViews(Activity activity) {
+        return android.os.Build.VERSION.SDK_INT >= 30;
     }
 
-    public static void create(Activity activity, String descriptor) {
-        final JSONObject config;
-        try { config = new JSONObject(descriptor); }
-        catch (JSONException error) { throw new IllegalArgumentException(error); }
-        final String id = config.optString("id");
-        final long generation = config.optLong("generation");
-        activity.runOnUiThread(() -> {
-            try {
-                Browser previous = BROWSERS.remove(id);
-                if (previous != null) previous.destroy();
-                Browser browser = new Browser(activity, id, generation, config);
-                BROWSERS.put(id, browser);
-                browser.emit(object("kind", "ready"));
-                browser.load(config.getJSONObject("source"));
-            } catch (Exception error) {
-                Browser failed = BROWSERS.remove(id);
-                if (failed != null) failed.destroy();
-                event(id, generation, object("kind", "error", "error", object("Native", error.toString())));
-            }
-        });
+    public static Factory newFactory(Activity activity, String descriptor) throws JSONException {
+        return new Factory(activity, new JSONObject(descriptor));
     }
 
-    public static void command(Activity activity, String id, String command) {
-        activity.runOnUiThread(() -> {
-            Browser browser = BROWSERS.get(id);
-            if (browser == null) return;
+    public static Object platformFactory(Factory factory) throws ClassNotFoundException {
+        // The generated application owns this interface; the AAR must not ship a copy.
+        ClassLoader loader = factory.activity.getClassLoader();
+        Class<?> contract = Class.forName("com.tessera.TesseraPlatformViewFactory", false, loader);
+        return Proxy.newProxyInstance(loader, new Class<?>[]{contract}, factory);
+    }
+
+    public static void command(Factory factory, String command) {
+        factory.activity.runOnUiThread(() -> {
             try {
                 JSONObject action = new JSONObject(command);
-                if (action.getLong("generation") != browser.generation) return;
-                switch (action.getString("kind")) {
-                    case "bounds": browser.bounds(action.getJSONArray("value")); break;
-                    case "visible": browser.view.setVisibility(action.getBoolean("value") ? View.VISIBLE : View.INVISIBLE); break;
-                    case "load": browser.load(action.getJSONObject("value")); break;
+                String kind = action.getString("kind");
+                Browser browser = factory.browser;
+                if (kind.equals("load")) {
+                    factory.source = action.getJSONObject("value");
+                    if (browser != null) browser.load(factory.source);
+                    return;
+                }
+                if (browser == null) return;
+                switch (kind) {
                     case "script": browser.view.evaluateJavascript(action.getString("value"), null); break;
                     case "evaluate":
                         long request = action.getLong("request");
                         browser.view.evaluateJavascript(action.getString("value"), value ->
-                            EVENTS.offer(object("id", Long.parseLong(id), "generation", browser.generation,
-                                "payload", object("type", "script", "request", request, "value", value == null ? "null" : value))));
+                            factory.emit(object("type", "script", "request", request, "value", value == null ? "null" : value)));
                         break;
                     case "back": browser.view.goBack(); break;
                     case "forward": browser.view.goForward(); break;
@@ -106,47 +92,110 @@ public final class WebViewPlugin {
                         CookieManager.getInstance().removeAllCookies(null);
                         WebStorage.getInstance().deleteAllData();
                         break;
-                    case "destroy": BROWSERS.remove(id, browser); browser.destroy(); break;
                     default: throw new IllegalArgumentException("Unknown WebView command");
                 }
             } catch (Exception error) {
-                browser.emit(object("kind", "error", "error", object("Native", error.toString())));
+                factory.error(error);
             }
         });
     }
 
-    public static String query(String id) {
-        Browser browser = BROWSERS.get(id);
-        return browser == null ? "{}" : browser.snapshot;
+    public static String query(Factory factory) {
+        return factory.snapshot;
     }
 
-    public static String poll(Activity activity) {
+    public static String poll(Factory factory) {
+        if (factory.events.isEmpty()) return "[]";
         JSONArray result = new JSONArray();
-        for (int i = 0; i < 256; i++) {
-            JSONObject event = EVENTS.poll();
+        for (int i = 0; i < 64; i++) {
+            JSONObject event = factory.events.poll();
             if (event == null) break;
             result.put(event);
         }
         return result.toString();
     }
 
-    private static final class Browser {
-        final String id;
+    public static final class Factory implements InvocationHandler {
+        final Activity activity;
+        final long id;
         final long generation;
-        final WebView view;
-        final FrameLayout container;
         final JSONObject options;
+        final ArrayBlockingQueue<JSONObject> events = new ArrayBlockingQueue<>(64);
+        JSONObject source;
+        Browser browser;
         volatile String snapshot = "{}";
-        float zoom = 1;
 
-        Browser(Activity activity, String id, long generation, JSONObject config) throws JSONException {
-            this.id = id;
-            this.generation = generation;
+        Factory(Activity activity, JSONObject config) throws JSONException {
+            this.activity = activity;
+            id = Long.parseLong(config.getString("id"));
+            generation = config.getLong("generation");
             options = config.getJSONObject("options");
-            container = new FrameLayout(activity);
-            container.setClipChildren(true);
-            view = new WebView(activity);
-            view.setVisibility(View.INVISIBLE);
+            source = config.getJSONObject("source");
+        }
+
+        void emit(JSONObject payload) {
+            events.offer(object("id", id, "generation", generation, "payload", payload));
+        }
+
+        void event(JSONObject event) { emit(object("type", "event", "event", event)); }
+
+        void error(Exception error) {
+            event(object("kind", "error", "error", object("Native", error.toString())));
+        }
+
+        View create() {
+            try {
+                browser = new Browser(this);
+                browser.configure();
+                browser.load(source);
+                browser.updateSnapshot();
+                event(object("kind", "ready"));
+                return browser.view;
+            } catch (Exception error) {
+                release();
+                error(error);
+                return new View(activity);
+            }
+        }
+
+        void release() {
+            if (browser != null) {
+                browser.destroy();
+                browser = null;
+            }
+            snapshot = "{}";
+        }
+
+        @Override public Object invoke(Object proxy, Method method, Object[] args) {
+            switch (method.getName()) {
+                case "create": return create();
+                case "update":
+                    if (browser != null) browser.updateSnapshot();
+                    return null;
+                case "reset": return null;
+                case "release": release(); return null;
+                case "hashCode": return System.identityHashCode(proxy);
+                case "equals": return proxy == args[0];
+                case "toString": return "TesseraWebViewFactory(" + id + ")";
+                default: throw new UnsupportedOperationException(method.getName());
+            }
+        }
+    }
+
+    private static final class Browser {
+        final Factory factory;
+        final WebView view;
+        final JSONObject options;
+        float zoom = 1;
+        volatile boolean inlineLoadPending;
+
+        Browser(Factory factory) {
+            this.factory = factory;
+            options = factory.options;
+            view = new WebView(factory.activity);
+        }
+
+        void configure() throws JSONException {
             WebSettings settings = view.getSettings();
             settings.setJavaScriptEnabled(options.optBoolean("javascript", true));
             settings.setDomStorageEnabled(true);
@@ -160,19 +209,22 @@ public final class WebViewPlugin {
             view.setBackgroundColor(android.graphics.Color.argb(background.getInt(3), background.getInt(0), background.getInt(1), background.getInt(2)));
             view.setWebViewClient(new WebViewClient() {
                 @Override public boolean shouldOverrideUrlLoading(WebView ignored, WebResourceRequest request) {
+                    if (request.isForMainFrame() && isPendingInlineLoad(request.getUrl().toString())) return false;
                     boolean blocked = !allows(request.getUrl().toString());
                     if (blocked && request.isForMainFrame()) emit(object("kind", "navigation_blocked", "url", request.getUrl().toString()));
                     return blocked;
                 }
                 @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView ignored, WebResourceRequest request) {
                     // Android skips shouldOverrideUrlLoading for POST requests.
-                    if (request.isForMainFrame() && !allows(request.getUrl().toString())) {
+                    if (request.isForMainFrame() && !allows(request.getUrl().toString())
+                            && !isPendingInlineLoad(request.getUrl().toString())) {
                         emit(object("kind", "navigation_blocked", "url", request.getUrl().toString()));
                         return new android.webkit.WebResourceResponse("text/plain", "UTF-8", 403, "Blocked", java.util.Collections.emptyMap(), new java.io.ByteArrayInputStream(new byte[0]));
                     }
                     return null;
                 }
                 @Override public void onPageStarted(WebView ignored, String url, Bitmap icon) {
+                    inlineLoadPending = false;
                     updateSnapshot();
                     emit(object("kind", "load_started", "url", url));
                     if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) injectScripts();
@@ -198,7 +250,6 @@ public final class WebViewPlugin {
             JSONObject ipc = options.getJSONObject("ipc");
             if (!ipc.getString("kind").equals("disabled")) {
                 if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
-                    view.destroy();
                     throw new IllegalStateException("System WebView lacks origin-verified IPC; update Android System WebView");
                 }
                 Set<String> origins = new HashSet<>();
@@ -217,28 +268,12 @@ public final class WebViewPlugin {
                 JSONArray scripts = options.getJSONArray("initialization_scripts");
                 for (int i = 0; i < scripts.length(); i++) WebViewCompat.addDocumentStartJavaScript(view, scripts.getString(i), java.util.Collections.singleton("*"));
             }
-            container.addView(view, new FrameLayout.LayoutParams(-1, -1));
-            ViewGroup content = activity.findViewById(android.R.id.content);
-            content.addView(container, new ViewGroup.LayoutParams(-1, -1));
-            bounds(config.getJSONArray("bounds"));
-            container.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, oright, ob) -> updateSnapshot());
         }
 
         void updateSnapshot() {
-            JSONArray bounds = new JSONArray(java.util.Arrays.asList(container.getX(), container.getY(), container.getWidth(), container.getHeight()));
-            snapshot = object("url", view.getUrl(), "back", view.canGoBack(), "forward", view.canGoForward(), "bounds", bounds).toString();
+            factory.snapshot = object("url", view.getUrl(), "back", view.canGoBack(), "forward", view.canGoForward()).toString();
         }
-        void emit(JSONObject event) { WebViewPlugin.event(id, generation, event); }
-        void bounds(JSONArray bounds) throws JSONException {
-            // Tessera reports physical pixels; Android view coordinates are also
-            // physical pixels, not density-independent layout dimensions.
-            container.setX((float) bounds.getDouble(0));
-            container.setY((float) bounds.getDouble(1));
-            ViewGroup.LayoutParams params = container.getLayoutParams();
-            params.width = Math.max(1, (int) Math.ceil(bounds.getDouble(2)));
-            params.height = Math.max(1, (int) Math.ceil(bounds.getDouble(3)));
-            container.setLayoutParams(params);
-        }
+        void emit(JSONObject event) { factory.event(event); }
         boolean allows(String value) {
             if (value.equals("about:blank")) return true;
             Uri uri = Uri.parse(value);
@@ -259,11 +294,18 @@ public final class WebViewPlugin {
             for (int i = 0; scripts != null && i < scripts.length(); i++) view.evaluateJavascript(scripts.optString(i), null);
         }
         void load(JSONObject source) throws JSONException {
-            if (source.getString("kind").equals("url")) view.loadUrl(source.getString("value"));
-            else view.loadDataWithBaseURL("about:blank", source.getString("value"), "text/html", "UTF-8", null);
+            if (source.getString("kind").equals("url")) {
+                inlineLoadPending = false;
+                view.loadUrl(source.getString("value"));
+            } else {
+                inlineLoadPending = true;
+                view.loadDataWithBaseURL("about:blank", source.getString("value"), "text/html", "UTF-8", null);
+            }
+        }
+        boolean isPendingInlineLoad(String url) {
+            return inlineLoadPending && url.startsWith("data:text/html");
         }
         void destroy() {
-            if (container.getParent() instanceof ViewGroup) ((ViewGroup) container.getParent()).removeView(container);
             view.stopLoading();
             view.destroy();
         }

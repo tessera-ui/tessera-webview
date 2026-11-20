@@ -1,1 +1,3 @@
 -keep class com.tessera.webview.WebViewPlugin { public static *; }
+-keep class com.tessera.webview.WebViewPlugin$Factory
+-keep interface com.tessera.TesseraPlatformViewFactory { *; }

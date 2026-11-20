@@ -1,0 +1,3 @@
+# Tessera discovers this crate as an Android library plugin when building a host.
+[plugin.android]
+module = "webview"

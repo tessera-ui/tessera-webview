@@ -24,6 +24,7 @@ fn configured_plugin() -> WebViewPlugin {
     plugin
 }
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 #[test]
 fn native_surface_hides_when_unplaced_partly_clipped_or_nonfinite() {
     let full = rect(20.25, 30.5, 100.5, 80.25);
