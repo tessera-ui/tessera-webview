@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "ios"))]
 use crate::WebViewError;
 
 #[cfg(target_os = "android")]
@@ -15,12 +16,7 @@ mod implementation;
 )))]
 #[path = "unsupported.rs"]
 mod implementation;
-#[cfg(any(
-    target_os = "windows",
-    target_os = "macos",
-    target_os = "linux",
-    target_os = "ios"
-))]
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 #[path = "native.rs"]
 mod native;
 
@@ -41,6 +37,7 @@ pub(crate) enum Command {
     ClearData,
 }
 
+#[cfg(not(target_os = "ios"))]
 fn error(error: impl std::fmt::Display) -> WebViewError {
     WebViewError::Native(error.to_string())
 }

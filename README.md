@@ -28,4 +28,4 @@ fn app() {
 | macOS | Wry (WKWebView) |
 | Linux (X11 / XWayland) | Wry (WebKitGTK) |
 | Android 11+ (API 30+) | `android.webkit.WebView` (AndroidX WebKit) |
-| iOS | Wry (WKWebView) |
+| iOS | `WKWebView` |
