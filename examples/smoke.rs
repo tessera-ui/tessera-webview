@@ -15,8 +15,8 @@ use tessera_ui::{
     remember, tessera, with_plugin,
 };
 use tessera_webview::{
-    EntryPointWebViewExt, IpcPolicy, NavigationPolicy, WebViewController, WebViewEvent,
-    WebViewOptions, WebViewPlugin, WebViewSource, webview,
+    IpcPolicy, NavigationPolicy, WebViewController, WebViewEvent, WebViewOptions, WebViewPackage,
+    WebViewPlugin, WebViewSource, webview,
 };
 
 static SUCCESS: AtomicBool = AtomicBool::new(false);
@@ -254,7 +254,7 @@ fn serve() -> String {
 #[tessera_ui::entry]
 fn entry() -> EntryPoint {
     let origin = serve();
-    EntryPoint::new(move || app(origin.clone())).webview()
+    EntryPoint::new(move || app(origin.clone())).package(WebViewPackage)
 }
 
 fn main() {

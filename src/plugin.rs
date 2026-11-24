@@ -4,7 +4,8 @@ use async_channel::{Receiver, Sender};
 use futures_channel::oneshot;
 use serde::Deserialize;
 use tessera_ui::{
-    CallbackWith, FloatRect, Plugin, PluginContext, PluginResult, Task, spawn_local, with_plugin,
+    CallbackWith, EntryRegistry, FloatRect, Plugin, PluginContext, PluginResult, Task,
+    TesseraPackage, spawn_local, with_plugin,
 };
 
 use crate::{WebViewError, WebViewEvent, WebViewOptions, WebViewSource, backend, next_id};
@@ -94,6 +95,16 @@ pub struct WebViewPlugin {
     events: Option<Task>,
     #[cfg(any(target_os = "android", target_os = "linux"))]
     pump: Option<Task>,
+}
+
+/// Package that registers native WebView services.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WebViewPackage;
+
+impl TesseraPackage for WebViewPackage {
+    fn register(self, registry: &mut EntryRegistry) {
+        registry.register_plugin(WebViewPlugin::new());
+    }
 }
 
 impl Default for WebViewPlugin {

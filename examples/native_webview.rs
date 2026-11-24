@@ -6,8 +6,8 @@ use tessera_ui::{
     tessera,
 };
 use tessera_webview::{
-    EntryPointWebViewExt, IpcPolicy, WebViewController, WebViewEvent, WebViewOptions,
-    WebViewSource, webview,
+    IpcPolicy, WebViewController, WebViewEvent, WebViewOptions, WebViewPackage, WebViewSource,
+    webview,
 };
 
 const PAGE: &str = r#"<!doctype html><title>Tessera native browser</title>
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
     EntryPoint::new(app)
-        .webview()
+        .package(WebViewPackage)
         .config(config)
         .run_desktop()?;
     Ok(())

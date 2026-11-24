@@ -12,7 +12,7 @@ cargo add tessera-webview
 
 ```rust
 use tessera_ui::{EntryPoint, tessera};
-use tessera_webview::{EntryPointWebViewExt, WebViewSource, webview};
+use tessera_webview::{WebViewPackage, WebViewSource, webview};
 
 #[tessera]
 fn app() {
@@ -20,7 +20,7 @@ fn app() {
 }
 
 fn main() {
-    EntryPoint::new(app).webview().run_desktop().unwrap();
+    EntryPoint::new(app).package(WebViewPackage).run_desktop().unwrap();
 }
 ```
 

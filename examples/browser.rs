@@ -1,7 +1,7 @@
 use tessera_ui::{EntryPoint, remember, tessera};
 use tessera_webview::{
-    EntryPointWebViewExt, IpcPolicy, WebViewController, WebViewEvent, WebViewOptions,
-    WebViewSource, webview,
+    IpcPolicy, WebViewController, WebViewEvent, WebViewOptions, WebViewPackage, WebViewSource,
+    webview,
 };
 
 const HTML: &str = r#"<!doctype html><html><meta charset="utf-8"><title>Tessera WebView</title>
@@ -26,7 +26,7 @@ fn app() {
 
 #[tessera_ui::entry]
 fn entry() -> EntryPoint {
-    EntryPoint::new(app).webview()
+    EntryPoint::new(app).package(WebViewPackage)
 }
 
 fn main() {

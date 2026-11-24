@@ -231,7 +231,7 @@ impl fmt::Display for WebViewError {
             Self::UnsupportedPlatform => f.write_str("no WebView backend for this target"),
             Self::UnsupportedOperation(value) => write!(f, "unsupported operation: {value}"),
             Self::PluginNotRegistered => {
-                f.write_str("register WebViewPlugin and use the owning UI session")
+                f.write_str("register WebViewPackage and use the owning UI session")
             }
             Self::HostNotResumed => f.write_str("the host renderer is suspended"),
             Self::NotMounted => f.write_str("the WebView component is not mounted"),

@@ -1,6 +1,6 @@
 //! Native WebView components for Tessera.
 //!
-//! Register [`WebViewPlugin`] with [`EntryPointWebViewExt::webview`], then place
+//! Register [`WebViewPackage`] with `EntryPoint::package`, then place
 //! [`webview()`] in a bounded layout. See the README for platform-specific
 //! composition behavior, prerequisites, and security limitations.
 
@@ -11,8 +11,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use tessera_foundation::modifier::ModifierExt as _;
 use tessera_ui::{
-    CallbackWith, EntryPoint, Modifier, Stack, layout::layout, modifier::FocusModifierExt as _,
-    remember, remember_with_key, with_plugin,
+    CallbackWith, Modifier, Stack, layout::layout, modifier::FocusModifierExt as _, remember,
+    remember_with_key, with_plugin,
 };
 #[cfg(any(
     target_os = "android",
@@ -27,7 +27,7 @@ mod backend;
 mod plugin;
 mod types;
 
-pub use plugin::WebViewPlugin;
+pub use plugin::{WebViewPackage, WebViewPlugin};
 pub use types::{
     IpcPolicy, NavigationPolicy, WebViewError, WebViewEvent, WebViewOptions, WebViewSource,
 };
@@ -176,7 +176,7 @@ impl Drop for Lease {
 ///
 /// ## Usage
 ///
-/// Register the plugin and place the view in a bounded layout.
+/// Register [`WebViewPackage`] and place the view in a bounded layout.
 ///
 /// ## Parameters
 ///
@@ -189,8 +189,8 @@ impl Drop for Lease {
 /// ## Examples
 ///
 /// ```
-/// use tessera_ui::{EntryPoint, remember, tessera};
-/// use tessera_webview::{EntryPointWebViewExt, WebViewController, WebViewSource, webview};
+/// use tessera_ui::{EntryPoint, remember, tessera, with_plugin};
+/// use tessera_webview::{WebViewController, WebViewPackage, WebViewPlugin, WebViewSource, webview};
 ///
 /// #[tessera]
 /// fn app() {
@@ -198,8 +198,9 @@ impl Drop for Lease {
 ///     webview(WebViewSource::html("<h1>Help</h1>"))
 ///         .controller(controller);
 /// }
-/// let entry = EntryPoint::new(app).webview();
+/// let entry = EntryPoint::new(app).package(WebViewPackage);
 /// let _session = entry.runtime_session().enter();
+/// assert!(with_plugin::<WebViewPlugin, _>(|_| ()).is_some());
 /// assert!(!WebViewController::new().is_ready());
 /// ```
 #[tessera_ui::tessera]
@@ -226,7 +227,7 @@ pub fn webview(
             on_event,
         )
     })
-    .expect("webview requires EntryPoint::webview() and a unique mounted controller");
+    .expect("webview requires WebViewPackage and a unique mounted controller");
     let modifier = modifier
         .unwrap_or_else(|| Modifier::new().fill_max_size())
         .on_layout_coordinates(move |coordinates: tessera_ui::LayoutCoordinates| {
@@ -247,16 +248,4 @@ pub fn webview(
         return;
     }
     layout(Stack).modifier(modifier);
-}
-
-/// Adds native WebView services to an application.
-pub trait EntryPointWebViewExt {
-    /// Registers [`WebViewPlugin`].
-    fn webview(self) -> Self;
-}
-
-impl EntryPointWebViewExt for EntryPoint {
-    fn webview(self) -> Self {
-        self.plugin(WebViewPlugin::new())
-    }
 }
