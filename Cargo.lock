@@ -21,26 +21,17 @@ checksum = "366ffbaa4442f4684d91e2cd7c5ea7c4ed8add41959a31447066e279e432b618"
 [[package]]
 name = "accesskit"
 version = "0.25.2"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e883d1d28c5fd5568c79ed2d2bd48d9f2fd3945c8974ed0f53690ceddb051be"
 dependencies = [
  "uuid",
 ]
 
 [[package]]
-name = "accesskit_android"
-version = "0.9.1"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
-dependencies = [
- "accesskit",
- "accesskit_consumer",
- "jni 0.21.1",
- "log",
-]
-
-[[package]]
 name = "accesskit_atspi_common"
 version = "0.21.1"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24f5baf62e34a4a6c30e3d697e4782f821a7337049c44c3b40576a27dfbb580d"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
@@ -53,29 +44,18 @@ dependencies = [
 [[package]]
 name = "accesskit_consumer"
 version = "0.39.2"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3da8f27636015191b2264ee1df681503170a632cafd832fdc1edfdd4e3a2fd3"
 dependencies = [
  "accesskit",
  "hashbrown 0.17.1",
-]
-
-[[package]]
-name = "accesskit_ios"
-version = "0.2.2"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
-dependencies = [
- "accesskit",
- "accesskit_consumer",
- "hashbrown 0.17.1",
- "objc2 0.5.3",
- "objc2-foundation 0.2.2",
- "objc2-ui-kit 0.2.2",
 ]
 
 [[package]]
 name = "accesskit_macos"
 version = "0.27.2"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "123828ceeec755b05255e3976cb0852993202de98a0626c97dd8d34246991f84"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
@@ -88,7 +68,8 @@ dependencies = [
 [[package]]
 name = "accesskit_unix"
 version = "0.24.1"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30d5192871228c54f1b0fb4a85cef000e11a3804f25d2165f14afa0daa67f3f6"
 dependencies = [
  "accesskit",
  "accesskit_atspi_common",
@@ -105,7 +86,8 @@ dependencies = [
 [[package]]
 name = "accesskit_windows"
 version = "0.35.2"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "498668b90da9995302a0055aaecad4756932333da2ddef6baee1c00844c430fc"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
@@ -3253,24 +3235,52 @@ dependencies = [
 ]
 
 [[package]]
-name = "tessera-accesskit-winit"
-version = "0.34.2"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+name = "tessera-accesskit-android"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03ea498631762417df10c34f4a1d59ccb72fdf51664311cf7ecef18e0d8dbb31"
 dependencies = [
  "accesskit",
- "accesskit_android",
- "accesskit_ios",
+ "accesskit_consumer",
+ "jni 0.21.1",
+ "log",
+]
+
+[[package]]
+name = "tessera-accesskit-ios"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39fed43fbe9b105c9197f4de84cce252346587f04fdf527bc653469a7cfbc7e9"
+dependencies = [
+ "accesskit",
+ "accesskit_consumer",
+ "hashbrown 0.17.1",
+ "objc2 0.5.3",
+ "objc2-foundation 0.2.2",
+ "objc2-ui-kit 0.2.2",
+]
+
+[[package]]
+name = "tessera-accesskit-winit"
+version = "0.34.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee67ec9acab6f74726885f738dadb80571c51e9b88e0c24c51f521832b885bf7"
+dependencies = [
+ "accesskit",
  "accesskit_macos",
  "accesskit_unix",
  "accesskit_windows",
  "raw-window-handle",
+ "tessera-accesskit-android",
+ "tessera-accesskit-ios",
  "tessera-winit",
 ]
 
 [[package]]
 name = "tessera-android-activity"
-version = "0.6.1"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25f5edda15309b71a2bd31c8ec46458616946725c77e92e0199cd3ee88797630"
 dependencies = [
  "android-properties",
  "bitflags 2.13.2",
@@ -3288,16 +3298,18 @@ dependencies = [
 
 [[package]]
 name = "tessera-foundation"
-version = "0.1.0"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1254f9e1fbfd9a7d16195f4c9db52b582e268ad89bb74ff873d39255c430b298"
 dependencies = [
  "tessera-ui",
 ]
 
 [[package]]
 name = "tessera-macros"
-version = "1.0.0"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f75e95ba41ed1c8f5a39724e165d1a6731ad288bd544a07233991d51f6d173b8"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -3307,8 +3319,9 @@ dependencies = [
 
 [[package]]
 name = "tessera-ui"
-version = "3.0.0"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2298e327eb1068b9e0dbdc7054a966d970995240ca5066b31056f97a57b0659d"
 dependencies = [
  "accesskit",
  "bumpalo",
@@ -3392,8 +3405,9 @@ dependencies = [
 
 [[package]]
 name = "tessera-winit"
-version = "0.30.13"
-source = "git+https://github.com/tessera-ui/tessera.git?rev=8740baaaa73fbdd36394e5fde512be06b9bce813#8740baaaa73fbdd36394e5fde512be06b9bce813"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4afd3cd35113f8f044675f094c7bb18046e03a5c09a1b8212dd6685817bd1e7"
 dependencies = [
  "ahash",
  "atomic-waker",
