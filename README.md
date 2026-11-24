@@ -1,14 +1,14 @@
 # tessera-webview
 
-A Rust library that provides native WebView components for Tessera applications.
+Native WebView components for Tessera apps.
 
-## Add to your project
+## Install
 
 ```sh
 cargo add tessera-webview
 ```
 
-## Example
+## Usage
 
 ```rust
 use tessera_ui::{EntryPoint, tessera};
@@ -28,9 +28,9 @@ fn main() {
 
 | Platform | Backend |
 | --- | --- |
-| Windows | WebView2 with DirectComposition; requires the WebView2 Runtime |
-| macOS | `WKWebView` in AppKit |
-| Linux (X11 / XWayland) | WebKitGTK (`webkit2gtk-4.1`) in a GTK 3 child window |
-| Linux (Wayland) | WPE WebKit with WPE Platform 2.54+; uses a `wl_subsurface` and `wl_shm` |
-| Android 11+ (API 30+) | `android.webkit.WebView` (AndroidX WebKit) |
+| Windows | WebView2 with DirectComposition |
+| macOS | AppKit `WKWebView` |
+| Linux (X11 / XWayland) | WebKitGTK in a GTK 3 child window |
+| Linux (Wayland) | WPE WebKit 2.54+ |
+| Android 11+ | AndroidX WebView |
 | iOS | `WKWebView` |
