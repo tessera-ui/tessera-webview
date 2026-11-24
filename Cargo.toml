@@ -3,6 +3,7 @@ name = "tessera-webview"
 version = "0.1.0"
 edition = "2024"
 description = "Native WebView components and platform services for Tessera"
+repository = "https://github.com/tessera-ui/tessera-webview"
 license = "MIT OR Apache-2.0"
 exclude = ["android/build", "android/.gradle", "android/local.properties"]
 
@@ -11,8 +12,8 @@ async-channel = "2.5"
 futures-channel = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tessera-foundation = { git = "https://github.com/tessera-ui/tessera.git", rev = "8740baaaa73fbdd36394e5fde512be06b9bce813" }
-tessera-ui = { git = "https://github.com/tessera-ui/tessera.git", rev = "8740baaaa73fbdd36394e5fde512be06b9bce813" }
+tessera-foundation = "0.1.1"
+tessera-ui = "4"
 tokio = { version = "1.48", features = ["time"] }
 url = "2.5"
 
