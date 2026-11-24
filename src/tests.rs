@@ -1,15 +1,6 @@
 use super::*;
 use crate::{IpcPolicy, NavigationPolicy, WebViewController};
 
-fn rect(x: f32, y: f32, width: f32, height: f32) -> FloatRect {
-    FloatRect {
-        x,
-        y,
-        width,
-        height,
-    }
-}
-
 fn configured_plugin() -> WebViewPlugin {
     let mut plugin = WebViewPlugin::new();
     plugin
@@ -22,28 +13,6 @@ fn configured_plugin() -> WebViewPlugin {
         )
         .unwrap();
     plugin
-}
-
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-#[test]
-fn native_surface_hides_when_unplaced_partly_clipped_or_nonfinite() {
-    let full = rect(20.25, 30.5, 100.5, 80.25);
-    let mut geometry = Geometry {
-        bounds: Some(full),
-        visible: Some(full),
-    };
-    assert!(geometry.is_visible());
-    geometry.visible = Some(rect(20.25, 30.5, f32::INFINITY, 80.25));
-    assert!(!geometry.is_visible());
-    geometry.visible = Some(rect(21.0, 30.5, 99.75, 80.25));
-    assert!(!geometry.is_visible());
-    geometry.visible = None;
-    assert!(!geometry.is_visible());
-    geometry.visible = Some(full);
-    geometry.bounds = Some(rect(f32::NAN, 0.0, 10.0, 10.0));
-    assert!(!geometry.is_visible());
-    geometry.bounds = Some(rect(0.0, 0.0, 0.0, 10.0));
-    assert!(!geometry.is_visible());
 }
 
 #[test]

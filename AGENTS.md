@@ -8,7 +8,10 @@ APIs.
 
 ## Platform backends
 
-- Windows, macOS, and Linux X11/XWayland use Wry desktop child views.
+- Use Tessera's `platform_view` factories for native browser surfaces.
+- Windows uses WebView2 with DirectComposition, macOS hosts `WKWebView` in
+  AppKit, X11/XWayland hosts WebKitGTK in a GTK child window, and Wayland uses
+  WPE WebKit through Tessera-owned subsurfaces when WPE Platform 2.54+ is available.
 - Android uses the system WebView through the Tessera platform-view host; the
   embedded component requires API 30 or newer.
 - iOS uses `WKWebView` directly through Tessera's UIKit platform-view factory.

@@ -54,30 +54,6 @@ impl EventSink {
     }
 }
 
-#[derive(Default)]
-struct Geometry {
-    bounds: Option<FloatRect>,
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    visible: Option<FloatRect>,
-}
-
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-impl Geometry {
-    fn is_visible(&self) -> bool {
-        let (Some(full), Some(visible)) = (self.bounds, self.visible) else {
-            return false;
-        };
-        // Native surfaces cannot inherit GPU clip stacks. Hide rather than leak
-        // pixels or input outside an ancestor's visible rectangular viewport.
-        valid_bounds(full)
-            && valid_bounds(visible)
-            && visible.x <= full.x + 0.01
-            && visible.y <= full.y + 0.01
-            && visible.x + visible.width >= full.x + full.width - 0.01
-            && visible.y + visible.height >= full.y + full.height - 0.01
-    }
-}
-
 fn valid_bounds(bounds: FloatRect) -> bool {
     [bounds.x, bounds.y, bounds.width, bounds.height]
         .iter()
@@ -93,7 +69,7 @@ struct Entry {
     source: WebViewSource,
     options: WebViewOptions,
     on_event: Option<CallbackWith<WebViewEvent>>,
-    geometry: Geometry,
+    bounds: Option<FloatRect>,
     native: Option<backend::NativeView>,
     ready: bool,
     last_error: Option<WebViewError>,
@@ -161,7 +137,7 @@ impl WebViewPlugin {
             source: source.clone(),
             options: options.clone(),
             on_event,
-            geometry: Geometry::default(),
+            bounds: None,
             native: None,
             ready: false,
             last_error: None,
@@ -200,22 +176,7 @@ impl WebViewPlugin {
         owner: u64,
         bounds: FloatRect,
     ) -> Result<(), WebViewError> {
-        let entry = self.owned(id, owner)?;
-        entry.geometry.bounds = Some(bounds);
-        #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        self.reconcile_and_report(id);
-        Ok(())
-    }
-
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    pub(crate) fn visibility(
-        &mut self,
-        id: u64,
-        owner: u64,
-        bounds: Option<FloatRect>,
-    ) -> Result<(), WebViewError> {
-        self.owned(id, owner)?.geometry.visible = bounds;
-        self.reconcile_and_report(id);
+        self.owned(id, owner)?.bounds = Some(bounds);
         Ok(())
     }
 
@@ -227,7 +188,13 @@ impl WebViewPlugin {
         Ok(entry)
     }
 
-    #[cfg(any(target_os = "android", target_os = "ios"))]
+    #[cfg(any(
+        target_os = "android",
+        target_os = "ios",
+        target_os = "windows",
+        target_os = "macos",
+        target_os = "linux"
+    ))]
     pub(crate) fn factory(
         &mut self,
         id: u64,
@@ -262,45 +229,6 @@ impl WebViewPlugin {
         }
     }
 
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    fn reconcile(&mut self, id: u64) -> Result<(), WebViewError> {
-        let sink = self.sink(id);
-        let entry = self.entries.get_mut(&id).unwrap();
-        let Some(context) = self.context.as_ref() else {
-            entry.options.validate()?;
-            entry.source.validate(&entry.options.navigation)?;
-            return Ok(());
-        };
-        let Some(bounds) = entry.geometry.bounds.filter(|bounds| valid_bounds(*bounds)) else {
-            if let Some(view) = &entry.native {
-                view.set_visible(false)?;
-            }
-            return Ok(());
-        };
-        let visible = entry.geometry.is_visible();
-        // Visibility is enforced even if a newly declared source is invalid.
-        if !visible && let Some(view) = &entry.native {
-            view.set_visible(false)?;
-        }
-        entry.options.validate()?;
-        entry.source.validate(&entry.options.navigation)?;
-        if entry.native.is_none() && visible {
-            entry.native = Some(backend::NativeView::new(
-                context,
-                &entry.source,
-                &entry.options,
-                bounds,
-                sink,
-            )?);
-        }
-        if let Some(view) = &entry.native {
-            view.set_bounds(bounds, context.window().scale_factor())?;
-            view.set_visible(visible)?;
-        }
-        Ok(())
-    }
-
-    #[cfg(any(target_os = "android", target_os = "ios"))]
     fn reconcile(&mut self, id: u64) -> Result<(), WebViewError> {
         let sink = self.sink(id);
         let entry = self.entries.get_mut(&id).unwrap();
@@ -329,18 +257,11 @@ impl WebViewPlugin {
     }
 
     pub(crate) fn bounds(&self, id: u64) -> Result<FloatRect, WebViewError> {
-        #[cfg(any(target_os = "android", target_os = "ios"))]
-        {
-            self.native(id)?;
-            self.entries[&id]
-                .geometry
-                .bounds
-                .filter(|bounds| valid_bounds(*bounds))
-                .ok_or(WebViewError::NotReady)
-        }
-        #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        self.native(id)?
-            .bounds(self.context.as_ref().unwrap().window().scale_factor())
+        self.native(id)?;
+        self.entries[&id]
+            .bounds
+            .filter(|bounds| valid_bounds(*bounds))
+            .ok_or(WebViewError::NotReady)
     }
 
     pub(crate) fn load(&mut self, id: u64, source: WebViewSource) -> Result<(), WebViewError> {
@@ -412,7 +333,13 @@ impl WebViewPlugin {
 
 impl Plugin for WebViewPlugin {
     fn on_resumed(&mut self, context: &PluginContext) -> PluginResult {
-        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        #[cfg(not(any(
+            target_os = "android",
+            target_os = "ios",
+            target_os = "windows",
+            target_os = "macos",
+            target_os = "linux"
+        )))]
         backend::initialize(context)?;
         if self.events.is_none() {
             let receiver = self.receiver.clone();
@@ -429,11 +356,9 @@ impl Plugin for WebViewPlugin {
         }
         #[cfg(target_os = "linux")]
         {
-            let context = context.clone();
-            let sender = self.sender.clone();
             self.pump = Some(spawn_local(async move {
                 loop {
-                    backend::pump(&context, &sender);
+                    backend::pump();
                     tokio::time::sleep(std::time::Duration::from_millis(16)).await;
                 }
             }));

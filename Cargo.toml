@@ -11,24 +11,35 @@ async-channel = "2.5"
 futures-channel = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tessera-foundation = { git = "https://github.com/tessera-ui/tessera.git", rev = "125f882717fdd92215f005e34e1cb6904fef2dda" }
-tessera-ui = { git = "https://github.com/tessera-ui/tessera.git", rev = "125f882717fdd92215f005e34e1cb6904fef2dda" }
+tessera-foundation = { git = "https://github.com/tessera-ui/tessera.git", rev = "8740baaaa73fbdd36394e5fde512be06b9bce813" }
+tessera-ui = { git = "https://github.com/tessera-ui/tessera.git", rev = "8740baaaa73fbdd36394e5fde512be06b9bce813" }
 tokio = { version = "1.48", features = ["time"] }
 url = "2.5"
 
-[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
-wry = "0.57.2"
-
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
+gdkx11 = "0.18"
+libloading = "0.8"
+
+[build-dependencies]
+cc = "1"
+pkg-config = "0.3"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 base64 = "0.22"
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_Graphics_DirectComposition", "Win32_System_Com", "Win32_UI_Input_Pointer", "Win32_UI_WindowsAndMessaging"] }
 
-[target.'cfg(target_os = "ios")'.dependencies]
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 block2 = "0.6"
 objc2 = "0.6"
 objc2-core-foundation = "0.3"
 objc2-foundation = { version = "0.3", features = ["NSDate", "NSError", "NSJSONSerialization", "NSString", "NSURL", "NSURLRequest"] }
-objc2-ui-kit = { version = "0.3", features = ["UIColor", "UIResponder", "UIView"] }
 objc2-web-kit = { version = "0.3", features = ["WKNavigation", "WKNavigationAction", "WKNavigationDelegate", "WKNavigationResponse", "WKScriptMessage", "WKScriptMessageHandler", "WKUserContentController", "WKUserScript", "WKWebViewConfiguration", "WKWebsiteDataStore"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2-ui-kit = { version = "0.3", features = ["UIColor", "UIResponder", "UIView"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", features = ["NSColor", "NSResponder", "NSView", "NSWindow"] }
+objc2-quartz-core = { version = "0.3", features = ["CALayer"] }

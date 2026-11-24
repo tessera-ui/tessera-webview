@@ -14,7 +14,13 @@ use tessera_ui::{
     CallbackWith, EntryPoint, Modifier, Stack, layout::layout, modifier::FocusModifierExt as _,
     remember, remember_with_key, with_plugin,
 };
-#[cfg(any(target_os = "android", target_os = "ios"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "linux"
+))]
 use tessera_ui::{key, platform_view::platform_view};
 
 mod backend;
@@ -170,8 +176,7 @@ impl Drop for Lease {
 ///
 /// ## Usage
 ///
-/// Register the plugin and place the view in a bounded layout. Desktop views
-/// must not overlap Tessera content drawn above them.
+/// Register the plugin and place the view in a bounded layout.
 ///
 /// ## Parameters
 ///
@@ -228,17 +233,19 @@ pub fn webview(
             let _ =
                 access(|plugin| plugin.position(controller.0, owner, coordinates.window_bounds()));
         });
-    #[cfg(any(target_os = "android", target_os = "ios"))]
+    #[cfg(any(
+        target_os = "android",
+        target_os = "ios",
+        target_os = "windows",
+        target_os = "macos",
+        target_os = "linux"
+    ))]
     if let Ok(Some((generation, factory))) = access(|plugin| plugin.factory(controller.0, owner)) {
         key(generation, || {
             platform_view(factory, modifier);
         });
         return;
     }
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    let modifier = modifier.on_visible_window_bounds(move |bounds| {
-        let _ = access(|plugin| plugin.visibility(controller.0, owner, bounds));
-    });
     layout(Stack).modifier(modifier);
 }
 

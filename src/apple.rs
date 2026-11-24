@@ -9,18 +9,27 @@ use objc2::{
     rc::Retained,
     runtime::{AnyObject, NSObject, ProtocolObject},
 };
+#[cfg(target_os = "macos")]
+use objc2_app_kit::{
+    NSAutoresizingMaskOptions, NSColor, NSResponder as Responder, NSView as NativeViewHost,
+};
 use objc2_foundation::{
     NSDate, NSError, NSJSONSerialization, NSJSONWritingOptions, NSObjectProtocol, NSString, NSURL,
     NSURLRequest,
 };
-use objc2_ui_kit::{UIColor, UIResponder, UIView};
+#[cfg(target_os = "ios")]
+use objc2_ui_kit::{UIColor, UIResponder as Responder, UIView as NativeViewHost};
 use objc2_web_kit::{
     WKNavigation, WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate,
     WKNavigationResponse, WKNavigationResponsePolicy, WKScriptMessage, WKScriptMessageHandler,
     WKUserContentController, WKUserScript, WKUserScriptInjectionTime, WKWebViewConfiguration,
     WKWebsiteDataStore,
 };
-use tessera_ui::{PluginContext, ios::platform_views::IosPlatformViewFactory};
+use tessera_ui::PluginContext;
+#[cfg(target_os = "ios")]
+use tessera_ui::ios::platform_views::IosPlatformViewFactory as HostFactory;
+#[cfg(target_os = "macos")]
+use tessera_ui::platform_view::MacosPlatformViewFactory as HostFactory;
 
 use crate::{
     IpcPolicy, NavigationPolicy, WebViewError, WebViewEvent, WebViewOptions, WebViewSource,
@@ -30,7 +39,7 @@ use crate::{
 use super::Command;
 
 extern_class!(
-    #[unsafe(super(UIView, UIResponder, NSObject))]
+    #[unsafe(super(NativeViewHost, Responder, NSObject))]
     #[thread_kind = MainThreadOnly]
     #[derive(Debug)]
     struct WKWebView;
@@ -295,7 +304,7 @@ struct Browser {
 
 impl Browser {
     fn new(
-        container: &UIView,
+        container: &NativeViewHost,
         source: &WebViewSource,
         options: &WebViewOptions,
         sink: EventSink,
@@ -353,23 +362,37 @@ impl Browser {
         };
         unsafe {
             web_view.setNavigationDelegate(Some(ProtocolObject::from_ref(&*delegate)));
+            #[cfg(target_os = "ios")]
             web_view.setAutoresizingMask(
                 objc2_ui_kit::UIViewAutoresizing::FlexibleWidth
                     | objc2_ui_kit::UIViewAutoresizing::FlexibleHeight,
+            );
+            #[cfg(target_os = "macos")]
+            web_view.setAutoresizingMask(
+                NSAutoresizingMaskOptions::ViewWidthSizable
+                    | NSAutoresizingMaskOptions::ViewHeightSizable,
             );
             if let Some(agent) = &options.user_agent {
                 web_view.setCustomUserAgent(Some(&NSString::from_str(agent)));
             }
             web_view.setPageZoom(1.0);
-            let [r, g, b, a] = options.background;
-            let color = UIColor::colorWithRed_green_blue_alpha(
-                f64::from(r) / 255.0,
-                f64::from(g) / 255.0,
-                f64::from(b) / 255.0,
-                f64::from(a) / 255.0,
-            );
-            web_view.setOpaque(a == 255);
-            web_view.setBackgroundColor(Some(&color));
+            let [r, g, b, a] = options.background.map(|channel| f64::from(channel) / 255.0);
+            #[cfg(target_os = "ios")]
+            {
+                let color = UIColor::colorWithRed_green_blue_alpha(r, g, b, a);
+                web_view.setOpaque(a == 1.0);
+                web_view.setBackgroundColor(Some(&color));
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let color = NSColor::colorWithSRGBRed_green_blue_alpha(r, g, b, a);
+                container.setWantsLayer(true);
+                if let Some(layer) = container.layer() {
+                    layer.setBackgroundColor(Some(&color.CGColor()));
+                }
+                let draws_background = objc2_foundation::NSNumber::new_bool(false);
+                let _: () = msg_send![&*web_view, setValue: &*draws_background, forKey: &*NSString::from_str("drawsBackground")];
+            }
             container.addSubview(&web_view);
             if web_view.respondsToSelector(objc2::sel!(setInspectable:)) {
                 let _: () = msg_send![&*web_view, setInspectable: options.devtools];
@@ -464,7 +487,14 @@ impl Browser {
                     self.web_view.reload();
                 }
                 Command::Focus => {
-                    if !self.web_view.becomeFirstResponder() {
+                    #[cfg(target_os = "ios")]
+                    let focused = self.web_view.becomeFirstResponder();
+                    #[cfg(target_os = "macos")]
+                    let focused = self
+                        .web_view
+                        .window()
+                        .is_some_and(|window| window.makeFirstResponder(Some(&self.web_view)));
+                    if !focused {
                         return Err(WebViewError::Native("WKWebView refused focus".into()));
                     }
                 }
@@ -512,9 +542,9 @@ struct FactoryState {
     browser: RefCell<Option<Browser>>,
 }
 
-impl IosPlatformViewFactory for Factory {
-    fn create(&self, main_thread: MainThreadMarker) -> Retained<UIView> {
-        let container = UIView::new(main_thread);
+impl HostFactory for Factory {
+    fn create(&self, main_thread: MainThreadMarker) -> Retained<NativeViewHost> {
+        let container = NativeViewHost::new(main_thread);
         match Browser::new(
             &container,
             &self.0.source.borrow(),
@@ -531,13 +561,13 @@ impl IosPlatformViewFactory for Factory {
         container
     }
 
-    fn update(&self, view: &UIView, _main_thread: MainThreadMarker) {
+    fn update(&self, view: &NativeViewHost, _main_thread: MainThreadMarker) {
         if let Some(browser) = self.0.browser.borrow().as_ref() {
             browser.web_view.setFrame(view.bounds());
         }
     }
 
-    fn release(&self, _view: Retained<UIView>, _main_thread: MainThreadMarker) {
+    fn release(&self, _view: Retained<NativeViewHost>, _main_thread: MainThreadMarker) {
         self.0.browser.take();
     }
 }
